@@ -6,6 +6,12 @@ Un'app [DeskThing](https://deskthing.app) per lo Spotify **Car Thing** che tiene
 [Komodo](https://komo.do) (due installazioni di Komodo Core) e **Home Assistant**, con un layout in
 stile terminale. I servizi fermi restano fissi in cima in rosso; quelli attivi scorrono lentamente sotto.
 
+| Tutto ok | Uno stack è giù |
+|---|---|
+| ![Tutti gli stack attivi, Rackbot cammina](docs/ok.jpg) | ![Stack fermo in rosso in cima, Rackbot a terra in glitch](docs/alarm.jpg) |
+
+*Screenshot alla risoluzione del Car Thing (800×480), con dati di esempio.*
+
 Una mascotte in pixel art, **Rackbot**, cammina lungo il fondo dello schermo. Quando qualcosa si rompe
 inciampa, cade… e lo schermo va in **glitch**.
 
