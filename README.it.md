@@ -74,3 +74,7 @@ Il display usa `app/client/mascot/walk_r0..7.png`, `walk_l0..7.png` (camminata a
 `tools/rackbot_frames.py` (Pillow). Per usare un tuo personaggio sostituisci quei PNG mantenendo le
 dimensioni (camminata 42×76, caduta 67×77) e i punti di ancoraggio in `app/client/main.ts`
 (`WALK_*`, `FALL_*`). Non mettere immagini personali o di terzi in un fork pubblico.
+
+## Licenza
+
+[MIT](LICENSE): puoi usarlo, modificarlo e condividerlo liberamente.

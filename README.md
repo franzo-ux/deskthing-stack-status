@@ -74,3 +74,7 @@ The client plays `app/client/mascot/walk_r0..7.png`, `walk_l0..7.png` (walking r
 `tools/rackbot_frames.py` (Pillow). To use your own character, replace those PNGs keeping the canvas
 sizes (walk 42×76, fall 67×77) and anchors in `app/client/main.ts` (`WALK_*`, `FALL_*`).
 Keep personal or third-party artwork out of a public fork.
+
+## License
+
+[MIT](LICENSE): you are free to use, modify and share it.
