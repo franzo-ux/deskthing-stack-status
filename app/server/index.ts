@@ -1,5 +1,6 @@
 import { createDeskThing } from "@deskthing/server";
 import { DESKTHING_EVENTS, SETTING_TYPES } from "@deskthing/types";
+import { isLang, LANGUAGE_OPTIONS, stateLabel, t, type Lang } from "../i18n";
 import { execFile } from "node:child_process";
 import { existsSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -18,10 +19,11 @@ type Group = {
   title: string;
   online: boolean;
   error: string | null;
+  missingKey?: boolean; // not configured yet: a warning, not a failure
   items: Item[];
 };
 
-type HomelabStatus = { checked: number; checkedLabel?: string; groups: Group[]; problems: number };
+type HomelabStatus = { checked: number; checkedLabel?: string; groups: Group[]; problems: number; lang?: Lang };
 
 const DeskThing = createDeskThing();
 const POLL_MS = 15000;
@@ -37,6 +39,7 @@ let config: Record<string, string> = {};
 let last: HomelabStatus = { checked: 0, groups: [], problems: 0 };
 let prevLevels = new Map<string, Level>();
 let firstPoll = true;
+let lang: Lang = "en";
 let timer: ReturnType<typeof setInterval> | null = null;
 
 // ---------------------------------------------------------------- Komodo
@@ -53,20 +56,6 @@ function stackLevel(state: string): Level {
   return "bad"; // stopped, down, dead, unhealthy, ...
 }
 
-const STATE_IT: Record<string, string> = {
-  running: "attivo",
-  stopped: "fermo",
-  down: "giù",
-  dead: "morto",
-  unhealthy: "non sano",
-  deploying: "deploy…",
-  restarting: "riavvio…",
-  created: "creato",
-  paused: "in pausa",
-  removing: "rimozione…",
-  unknown: "sconosciuto",
-};
-
 async function komodo(url: string, key: string, secret: string, type: string): Promise<any> {
   const res = await fetch(url.replace(/\/+$/, "") + "/read", {
     method: "POST",
@@ -74,7 +63,7 @@ async function komodo(url: string, key: string, secret: string, type: string): P
     body: JSON.stringify({ type, params: {} }),
     signal: AbortSignal.timeout(6000),
   });
-  if (res.status === 401 || res.status === 403) throw new Error("chiave API non valida");
+  if (res.status === 401 || res.status === 403) throw new Error(t(lang, "badKey"));
   if (!res.ok) throw new Error("HTTP " + res.status);
   return res.json();
 }
@@ -85,7 +74,8 @@ async function checkCore(core: (typeof CORES)[number]): Promise<Group> {
   const secret = config[core.id + "_secret"] || "";
   const group: Group = { id: core.id, title: core.title, online: false, error: null, items: [] };
   if (!key || !secret) {
-    group.error = "manca la chiave API nelle impostazioni";
+    group.error = t(lang, "missingKey");
+    group.missingKey = true;
     return group;
   }
   try {
@@ -102,14 +92,14 @@ async function checkCore(core: (typeof CORES)[number]): Promise<Group> {
         group.items.push({
           key: core.id + "/server/" + s.id,
           name: "server " + s.name,
-          detail: state.toLowerCase() === "disabled" ? "disabilitato" : "non raggiungibile",
+          detail: state.toLowerCase() === "disabled" ? t(lang, "serverDisabled") : t(lang, "serverUnreachable"),
           level: state.toLowerCase() === "disabled" ? "warn" : "bad",
         });
       }
     }
     if (!Array.isArray(stacks) || stacks.length === 0) {
       // valid key but nothing visible: usually missing Read permissions
-      group.items.push({ key: core.id + "/empty", name: "stack", detail: "nessuno visibile (permessi?)", level: "warn" });
+      group.items.push({ key: core.id + "/empty", name: "stack", detail: t(lang, "noStacks"), level: "warn" });
     }
     for (const st of Array.isArray(stacks) ? stacks : []) {
       const state = String(st?.info?.state ?? "unknown");
@@ -117,12 +107,13 @@ async function checkCore(core: (typeof CORES)[number]): Promise<Group> {
       group.items.push({
         key: core.id + "/stack/" + st.id,
         name: st.name,
-        detail: (STATE_IT[state.toLowerCase()] || state) + (services ? " · " + services + (services === 1 ? " servizio" : " servizi") : ""),
+        // "· N" = number of services; the client shows it as "(N)"
+        detail: stateLabel(lang, state) + (services ? " · " + services : ""),
         level: stackLevel(state),
       });
     }
   } catch (e) {
-    group.error = e instanceof Error ? (e.name === "TimeoutError" ? "non risponde" : e.message) : String(e);
+    group.error = e instanceof Error ? (e.name === "TimeoutError" ? t(lang, "noReply") : e.message) : String(e);
   }
   return group;
 }
@@ -136,11 +127,11 @@ async function checkHomeAssistant(): Promise<Group> {
     group.items.push({
       key: "ha",
       name: "Home Assistant",
-      detail: group.online ? "online" : "errore " + res.status,
+      detail: group.online ? t(lang, "online") : t(lang, "httpError", { n: res.status }),
       level: group.online ? "ok" : "bad",
     });
   } catch {
-    group.items.push({ key: "ha", name: "Home Assistant", detail: "non risponde", level: "bad" });
+    group.items.push({ key: "ha", name: "Home Assistant", detail: t(lang, "noReply"), level: "bad" });
   }
   return group;
 }
@@ -162,10 +153,10 @@ function wakeScreen() {
 }
 
 function alert(text: string) {
-  console.log("Homelab alert: " + text);
+  console.log("Stack Status alert: " + text);
   wakeScreen();
   DeskThing.send({ type: "alert", payload: { text, at: Date.now() } });
-  // Let Pi Status (usually on screen) show it and switch over to Homelab.
+  // Let Pi Status (usually on screen) show it and switch over to Stack Status.
   // DeskThing 0.11 routes sendToApp back to the sender, so use a file instead:
   // Pi Status watches apps/homelab/alert.json.
   try {
@@ -183,7 +174,7 @@ async function poll() {
     const coreKey = g.id + "/core";
     // a Komodo core that does not answer is itself a problem (no blind spot)
     if (g.id !== "ha") {
-      const lvl: Level = g.online ? "ok" : g.error && g.error.startsWith("manca") ? "warn" : "bad";
+      const lvl: Level = g.online ? "ok" : g.missingKey ? "warn" : "bad";
       levels.set(coreKey, lvl);
       if (!firstPoll && lvl === "bad" && prevLevels.get(coreKey) !== "bad") news.push(g.title + ": " + g.error);
     }
@@ -197,11 +188,11 @@ async function poll() {
   let problems = 0;
   levels.forEach((l) => l === "bad" && problems++);
   // the Car Thing clock/time zone is not reliable: format the time here
-  const t = new Date();
+  const d = new Date();
   const hh = (n: number) => (n < 10 ? "0" : "") + n;
-  last = { checked: t.getTime(), checkedLabel: hh(t.getHours()) + ":" + hh(t.getMinutes()) + ":" + hh(t.getSeconds()), groups, problems };
+  last = { checked: d.getTime(), checkedLabel: hh(d.getHours()) + ":" + hh(d.getMinutes()) + ":" + hh(d.getSeconds()), groups, problems, lang };
   DeskThing.send({ type: "homelab_status", payload: last });
-  if (news.length) alert(news.length === 1 ? news[0] : news.length + " problemi: " + news.slice(0, 3).join(", "));
+  if (news.length) alert(news.length === 1 ? news[0] : t(lang, "nProblems", { n: news.length, list: news.slice(0, 3).join(", ") }));
 }
 
 let resend: ReturnType<typeof setInterval> | null = null;
@@ -225,20 +216,30 @@ function readSettings(settings: any) {
 }
 
 DeskThing.on(DESKTHING_EVENTS.START, async () => {
+  const before = (await DeskThing.getSettings()) as any;
+  if (isLang(before?.language?.value)) lang = before.language.value;
   const settings: any = {};
+  settings.language = {
+    id: "language",
+    label: t(lang, "setLanguage"),
+    description: t(lang, "setLanguageDesc"),
+    type: SETTING_TYPES.SELECT,
+    value: lang,
+    options: LANGUAGE_OPTIONS,
+  };
   for (const core of CORES) {
-    settings[core.id + "_url"] = { id: core.id + "_url", label: core.id + " · indirizzo", type: SETTING_TYPES.STRING, value: core.url };
-    settings[core.id + "_key"] = { id: core.id + "_key", label: core.id + " · API key", type: SETTING_TYPES.STRING, value: "" };
-    settings[core.id + "_secret"] = { id: core.id + "_secret", label: core.id + " · API secret", type: SETTING_TYPES.STRING, value: "" };
+    settings[core.id + "_url"] = { id: core.id + "_url", label: t(lang, "setUrl", { core: core.id }), type: SETTING_TYPES.STRING, value: core.url };
+    settings[core.id + "_key"] = { id: core.id + "_key", label: t(lang, "setKey", { core: core.id }), type: SETTING_TYPES.STRING, value: "" };
+    settings[core.id + "_secret"] = { id: core.id + "_secret", label: t(lang, "setSecret", { core: core.id }), type: SETTING_TYPES.STRING, value: "" };
   }
   settings.test_alert = {
     id: "test_alert",
-    label: "Allarme di prova",
-    description: "Attivalo per provare l'avviso e il passaggio da Pi Status (poi spegnilo)",
+    label: t(lang, "setTest"),
+    description: t(lang, "setTestDesc"),
     type: SETTING_TYPES.BOOLEAN,
     value: false,
   };
-  settings.ha_url = { id: "ha_url", label: "Home Assistant · indirizzo", type: SETTING_TYPES.STRING, value: DEFAULT_HA };
+  settings.ha_url = { id: "ha_url", label: t(lang, "setHa"), type: SETTING_TYPES.STRING, value: DEFAULT_HA };
   await DeskThing.initSettings(settings);
   const saved = (await DeskThing.getSettings()) as any;
   testAlert = saved?.test_alert?.value === true;
@@ -249,9 +250,11 @@ DeskThing.on(DESKTHING_EVENTS.START, async () => {
 let testAlert = false;
 
 DeskThing.on(DESKTHING_EVENTS.SETTINGS, (data) => {
-  const t = (data.payload as any)?.test_alert?.value === true;
-  if (t && !testAlert) alert("allarme di prova");
-  testAlert = t;
+  const l = (data.payload as any)?.language?.value;
+  if (isLang(l)) lang = l; // texts follow at the next poll; setting labels at next start
+  const on = (data.payload as any)?.test_alert?.value === true;
+  if (on && !testAlert) alert(t(lang, "testAlert"));
+  testAlert = on;
   readSettings(data.payload);
   firstPoll = true; // new keys: do not raise alerts for the first round
   startPolling();

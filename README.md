@@ -21,6 +21,7 @@ trips, falls over… and the screen **glitches**.
 - New alarms: the Car Thing screen wakes up, the display shakes, and — with
   [Pi Status](https://github.com/franzo-ux/deskthing-pi-status) on screen — the Car Thing switches here.
 - "Test alarm" switch in the settings to try the whole chain safely.
+- **English or Italian**: pick the language in the settings.
 
 ## Requirements
 
@@ -34,7 +35,7 @@ On **each** Komodo Core:
 
 1. **Settings → Users** → create a **Service User** (e.g. `deskthing`).
 2. Give it **Read** permission on **Servers** and **Stacks** (directly or through a user group).
-   Without it, Komodo answers with empty lists and the app shows `stack nessuno visibile (permessi?)`.
+   Without it, Komodo answers with empty lists and the app shows `stack none visible (permissions?)`.
 3. On that user: **API Keys → New API Key** and copy **key** and **secret** (the secret is shown once).
 
 Never put the keys in the code or in this repository: they go in the DeskThing settings.
@@ -51,17 +52,19 @@ npm run deploy         # copies the app into DeskThing and registers it
 Start DeskThing and fill in the app settings. To update later: `npm run build`,
 `npm run deploy -- --files`, restart DeskThing.
 
-## 3. Settings (DeskThing → Apps → Homelab)
+## 3. Settings (DeskThing → Apps → Stack Status)
 
 | Setting | Meaning |
 |---|---|
-| komodo · indirizzo / API key / API secret | first Komodo Core, e.g. `http://komodo-1.local:9120` |
-| komodo-op · indirizzo / API key / API secret | second Komodo Core |
-| Home Assistant · indirizzo | e.g. `http://homeassistant.local:8123` (only checks it answers) |
-| Allarme di prova | turn it on to fire a test alarm, then turn it off |
+| Language | **English** (default) or **Italiano**: the screen switches at once, the setting labels after restarting DeskThing |
+| komodo · URL / API key / API secret | first Komodo Core, e.g. `http://komodo-1.local:9120` |
+| komodo-op · URL / API key / API secret | second Komodo Core |
+| Home Assistant · URL | e.g. `http://homeassistant.local:8123` (only checks it answers) |
+| Test alarm | turn it on to fire a test alarm, then turn it off |
 
 The two Komodo slots are called `komodo` and `komodo-op` (setting keys); to use only one, leave the
 other without keys (it shows as a warning, not as an alarm).
+The app id is `homelab` (its first name): keep it if you fork, the other apps look for it.
 
 ## How it works
 

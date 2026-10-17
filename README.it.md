@@ -10,7 +10,7 @@ stile terminale. I servizi fermi restano fissi in cima in rosso; quelli attivi s
 |---|---|
 | ![Tutti gli stack attivi, Rackbot cammina](docs/ok.jpg) | ![Stack fermo in rosso in cima, Rackbot a terra in glitch](docs/alarm.jpg) |
 
-*Screenshot alla risoluzione del Car Thing (800×480), con dati di esempio.*
+*Screenshot alla risoluzione del Car Thing (800×480), con dati di esempio, in inglese (lingua predefinita).*
 
 Una mascotte in pixel art, **Rackbot**, cammina lungo il fondo dello schermo. Quando qualcosa si rompe
 inciampa, cade… e lo schermo va in **glitch**.
@@ -21,6 +21,7 @@ inciampa, cade… e lo schermo va in **glitch**.
 - Nuovi allarmi: lo schermo del Car Thing si riaccende, il display "trema" e — se è aperta
   [Pi Status](https://github.com/franzo-ux/deskthing-pi-status) — il Car Thing passa a questa app.
 - Interruttore "Allarme di prova" nelle impostazioni per provare tutta la catena senza rischi.
+- **Italiano o inglese**: la lingua si sceglie nelle impostazioni (predefinita: inglese).
 
 ## Requisiti
 
@@ -51,10 +52,11 @@ npm run deploy         # copia l'app in DeskThing e la registra
 Riapri DeskThing e compila le impostazioni dell'app. Per aggiornare in futuro: `npm run build`,
 `npm run deploy -- --files`, riavvia DeskThing.
 
-## 3. Impostazioni (DeskThing → App → Homelab)
+## 3. Impostazioni (DeskThing → App → Stack Status)
 
 | Impostazione | Significato |
 |---|---|
+| Language / Lingua | **English** (predefinita) o **Italiano**: lo schermo cambia subito, le voci delle impostazioni dopo il riavvio di DeskThing |
 | komodo · indirizzo / API key / API secret | primo Komodo Core, es. `http://komodo-1.local:9120` |
 | komodo-op · indirizzo / API key / API secret | secondo Komodo Core |
 | Home Assistant · indirizzo | es. `http://homeassistant.local:8123` (controlla solo che risponda) |
@@ -62,6 +64,7 @@ Riapri DeskThing e compila le impostazioni dell'app. Per aggiornare in futuro: `
 
 I due posti per Komodo si chiamano `komodo` e `komodo-op` (chiavi delle impostazioni); per usarne uno
 solo lascia l'altro senza chiavi (compare come avviso, non come allarme).
+L'id dell'app è `homelab` (il suo primo nome): tienilo se fai un fork, le altre app lo cercano.
 
 ## Come funziona
 

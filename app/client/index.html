@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="it">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Homelab</title>
+<title>Stack Status</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
@@ -34,7 +34,7 @@
   .line { overflow: hidden; text-overflow: ellipsis; }
   .foot { flex-shrink: 0; }
 
-  /* the maid walks along this floor strip, across the whole screen */
+  /* the mascot walks along this floor strip, across the whole screen */
   .mascot { height: 82px; flex-shrink: 0; position: relative; overflow: hidden;
     border-top: 1px solid rgba(110,231,160,.08); }
   #actor { position: absolute; left: 0; bottom: 0; will-change: transform; }
@@ -84,7 +84,7 @@
       <div id="log" class="log">
         <div class="head"><span class="hd">$ komodo status --watch</span><span id="foot" class="foot"></span></div>
         <div id="pinned"></div>
-        <div id="viewport" class="viewport"><div id="scroller"><div class="dim">collegamento…</div></div></div>
+        <div id="viewport" class="viewport"><div id="scroller"><div class="dim">connecting…</div></div></div>
       </div>
     </div>
     <div id="mascot" class="mascot">

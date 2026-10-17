@@ -1,9 +1,10 @@
 import { createDeskThing } from "@deskthing/client";
+import { isLang, t, type Key, type Lang } from "../i18n";
 
 type Level = "ok" | "warn" | "bad";
 type Item = { key: string; name: string; detail: string; level: Level };
-type Group = { id: string; title: string; online: boolean; error: string | null; items: Item[] };
-type HomelabStatus = { checked: number; checkedLabel?: string; groups: Group[]; problems: number };
+type Group = { id: string; title: string; online: boolean; error: string | null; missingKey?: boolean; items: Item[] };
+type HomelabStatus = { checked: number; checkedLabel?: string; groups: Group[]; problems: number; lang?: Lang };
 
 const DeskThing = createDeskThing();
 
@@ -14,7 +15,10 @@ document.addEventListener("mousedown", (e) => e.preventDefault(), true);
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 
 const TAG: Record<Level, string> = { ok: "[ OK ]", warn: "[WARN]", bad: "[FAIL]" };
-const SHORT: Record<string, string> = { komodo: "komodo", "komodo-op": "komodo-op", ha: "casa" };
+const SHORT: Record<string, string> = { komodo: "komodo", "komodo-op": "komodo-op" };
+
+let lang: Lang = "en";
+const tr = (key: Key, vars?: Record<string, string | number>) => t(lang, key, vars);
 
 let status: HomelabStatus | null = null;
 let troubleSince: number | null = null;
@@ -35,7 +39,7 @@ function clock(ms: number) {
 }
 
 function line(level: Level, group: string, name: string, detail: string) {
-  detail = detail.replace(/ · (\d+) servizi?o?$/, " ($1)");
+  detail = detail.replace(/ · (\d+)$/, " ($1)"); // number of services
   return (
     '<div class="line"><span class="tag-' + level + " " + level + '">' + TAG[level] + "</span> " +
     '<span class="' + (level === "ok" ? "" : level) + '">' + esc(pad(group, 10)) + " " + esc(pad(name, 15)) + " " + esc(detail) + "</span></div>"
@@ -56,10 +60,10 @@ function render() {
   const problems: { level: Level; html: string }[] = [];
   const healthy: string[] = [];
   for (const g of status.groups) {
-    const short = SHORT[g.id] || g.id;
+    const short = g.id === "ha" ? tr("home") : SHORT[g.id] || g.id;
     if (g.id !== "ha" && !g.online) {
-      const level: Level = g.error && g.error.indexOf("manca") === 0 ? "warn" : "bad";
-      problems.push({ level, html: line(level, short, "core", g.error || "non risponde") });
+      const level: Level = g.missingKey ? "warn" : "bad";
+      problems.push({ level, html: line(level, short, "core", g.error || tr("noReply")) });
       continue;
     }
     for (const it of g.items) {
@@ -71,7 +75,7 @@ function render() {
   // stopped / failing first, then warnings: always on top, never scrolling
   problems.sort((a, b) => (a.level === b.level ? 0 : a.level === "bad" ? -1 : 1));
   const pinned = problems.slice(0, MAX_PINNED).map((p) => '<div class="pin pin-' + p.level + '">' + p.html + "</div>");
-  if (problems.length > MAX_PINNED) pinned.push('<div class="pin pin-bad"><span class="bad">… e altri ' + (problems.length - MAX_PINNED) + " problemi</span></div>");
+  if (problems.length > MAX_PINNED) pinned.push('<div class="pin pin-bad"><span class="bad">' + esc(tr("moreProblems", { n: problems.length - MAX_PINNED })) + "</span></div>");
   const nextPinned = pinned.join("");
   if (nextPinned !== pinnedHtml) {
     pinnedHtml = nextPinned;
@@ -89,12 +93,12 @@ function render() {
   if (bad && troubleSince === null) troubleSince = Date.now();
   if (!bad) troubleSince = null;
 
-  const t = new Date(status.checked);
+  const d = new Date(status.checked);
   const hh = (n: number) => (n < 10 ? "0" : "") + n;
   $("foot").innerHTML = bad
-    ? '<span class="bad">!! ' + bad + (bad === 1 ? " problema" : " problemi") + " da " + clock(Date.now() - (troubleSince || Date.now())) + "</span>" +
-      '<span class="hd">  · ' + healthy.length + " attivi</span>"
-    : '<span class="hd">ultimo controllo ' + (status.checkedLabel || hh(t.getHours()) + ":" + hh(t.getMinutes()) + ":" + hh(t.getSeconds())) + " · " + healthy.length + " attivi</span>";
+    ? '<span class="bad">' + tr(bad === 1 ? "problemFor" : "problemsFor", { n: bad, t: clock(Date.now() - (troubleSince || Date.now())) }) + "</span>" +
+      '<span class="hd">  · ' + tr("running", { n: healthy.length }) + "</span>"
+    : '<span class="hd">' + tr("lastCheck", { time: status.checkedLabel || hh(d.getHours()) + ":" + hh(d.getMinutes()) + ":" + hh(d.getSeconds()), n: healthy.length }) + "</span>";
 
   setTrouble(bad > 0);
 }
@@ -129,9 +133,9 @@ function scroll(t: number) {
 requestAnimationFrame(scroll);
 window.addEventListener("resize", () => layoutScroller());
 
-// ---------- mascot: the maid walks; on trouble she trips, falls, then glitches ----------
+// ---------- mascot: Rackbot walks; on trouble it trips, falls, then glitches ----------
 
-// frame canvases and their anchor (head / centre of mass), from design/maid_frames.py
+// frame canvases and their anchor (head / centre of mass), from tools/rackbot_frames.py
 const WALK_W = 42;
 const WALK_ANCHOR = 21;
 const FALL_ANCHOR = 35;
@@ -235,6 +239,11 @@ function shock() {
 
 DeskThing.on("homelab_status", (data: any) => {
   status = data.payload as HomelabStatus;
+  if (isLang(status.lang) && status.lang !== lang) {
+    lang = status.lang;
+    document.documentElement.lang = lang;
+    pinnedHtml = okHtml = ""; // force a full redraw in the new language
+  }
   render();
 });
 DeskThing.on("alert", () => shock());

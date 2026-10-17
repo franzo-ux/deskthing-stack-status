@@ -2,7 +2,7 @@
     "id": "homelab",
     "isWebApp": true,
     "requires": ["pistatus"],
-    "label": "Homelab",
+    "label": "Stack Status",
     "version": "0.1.0",
     "version_code": "0.1",
     "compatible_server": ["11"],
