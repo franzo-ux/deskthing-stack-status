@@ -68,8 +68,21 @@ async function komodo(url: string, key: string, secret: string, type: string): P
   return res.json();
 }
 
+/** The core's URL; an empty URL in the settings turns that core off. */
+function coreUrl(core: (typeof CORES)[number]): string {
+  const id = core.id + "_url";
+  return (id in config ? config[id] : core.url).trim();
+}
+
+/** "fetch failed" and timeouts mean the host does not answer. */
+function errorText(e: unknown): string {
+  if (!(e instanceof Error)) return String(e);
+  if (e.name === "TimeoutError" || e.message === "fetch failed") return t(lang, "noReply");
+  return e.message;
+}
+
 async function checkCore(core: (typeof CORES)[number]): Promise<Group> {
-  const url = config[core.id + "_url"] || core.url;
+  const url = coreUrl(core);
   const key = config[core.id + "_key"] || "";
   const secret = config[core.id + "_secret"] || "";
   const group: Group = { id: core.id, title: core.title, online: false, error: null, items: [] };
@@ -113,16 +126,32 @@ async function checkCore(core: (typeof CORES)[number]): Promise<Group> {
       });
     }
   } catch (e) {
-    group.error = e instanceof Error ? (e.name === "TimeoutError" ? t(lang, "noReply") : e.message) : String(e);
+    group.error = errorText(e);
   }
   return group;
 }
 
+// Home Assistant's IP address can change (DHCP, updates): if the configured
+// URL does not answer, also try its mDNS name before raising an alarm.
+const HA_FALLBACK = "http://homeassistant.local:8123";
+
+async function fetchHa(): Promise<Response> {
+  const urls = [config.ha_url || DEFAULT_HA, HA_FALLBACK].filter((u, i, a) => a.indexOf(u) === i);
+  let error: unknown = null;
+  for (const url of urls) {
+    try {
+      return await fetch(url, { signal: AbortSignal.timeout(5000) });
+    } catch (e) {
+      error = e;
+    }
+  }
+  throw error;
+}
+
 async function checkHomeAssistant(): Promise<Group> {
-  const url = config.ha_url || DEFAULT_HA;
   const group: Group = { id: "ha", title: "home assistant", online: false, error: null, items: [] };
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+    const res = await fetchHa();
     group.online = res.status < 500;
     group.items.push({
       key: "ha",
@@ -167,7 +196,7 @@ function alert(text: string) {
 }
 
 async function poll() {
-  const groups = await Promise.all([...CORES.map(checkCore), checkHomeAssistant()]);
+  const groups = await Promise.all([...CORES.filter((c) => coreUrl(c)).map(checkCore), checkHomeAssistant()]);
   const levels = new Map<string, Level>();
   const news: string[] = [];
   for (const g of groups) {

@@ -63,7 +63,9 @@ Start DeskThing and fill in the app settings. To update later: `npm run build`,
 | Test alarm | turn it on to fire a test alarm, then turn it off |
 
 The two Komodo slots are called `komodo` and `komodo-op` (setting keys); to use only one, leave the
-other without keys (it shows as a warning, not as an alarm).
+other without keys (it shows as a warning, not as an alarm), or clear its URL to hide it completely.
+If Home Assistant does not answer on its URL, the app also tries `http://homeassistant.local:8123`
+(useful when its IP address changes).
 The app id is `homelab` (its first name): keep it if you fork, the other apps look for it.
 
 ## How it works

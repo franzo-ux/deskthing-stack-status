@@ -63,7 +63,9 @@ Riapri DeskThing e compila le impostazioni dell'app. Per aggiornare in futuro: `
 | Allarme di prova | accendilo per generare un allarme di prova, poi spegnilo |
 
 I due posti per Komodo si chiamano `komodo` e `komodo-op` (chiavi delle impostazioni); per usarne uno
-solo lascia l'altro senza chiavi (compare come avviso, non come allarme).
+solo lascia l'altro senza chiavi (compare come avviso, non come allarme), oppure cancellane l'indirizzo per
+nasconderlo del tutto. Se Home Assistant non risponde al suo indirizzo, l'app prova anche
+`http://homeassistant.local:8123` (utile quando cambia indirizzo IP).
 L'id dell'app è `homelab` (il suo primo nome): tienilo se fai un fork, le altre app lo cercano.
 
 ## Come funziona
