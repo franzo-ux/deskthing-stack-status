@@ -60,6 +60,7 @@ Start DeskThing and fill in the app settings. To update later: `npm run build`,
 | komodo · URL / API key / API secret | first Komodo Core, e.g. `http://komodo-1.local:9120` |
 | komodo-op · URL / API key / API secret | second Komodo Core |
 | Home Assistant · URL | e.g. `http://homeassistant.local:8123` (only checks it answers) |
+| Other web services | more services to check like Home Assistant: `name=URL`, comma separated, e.g. `Uptime Kuma=http://kuma.local:3001` |
 | Test alarm | turn it on to fire a test alarm, then turn it off |
 
 The two Komodo slots are called `komodo` and `komodo-op` (setting keys); to use only one, leave the

@@ -60,6 +60,7 @@ Riapri DeskThing e compila le impostazioni dell'app. Per aggiornare in futuro: `
 | komodo · indirizzo / API key / API secret | primo Komodo Core, es. `http://komodo-1.local:9120` |
 | komodo-op · indirizzo / API key / API secret | secondo Komodo Core |
 | Home Assistant · indirizzo | es. `http://homeassistant.local:8123` (controlla solo che risponda) |
+| Altri servizi web | altri servizi da controllare come Home Assistant: `nome=indirizzo`, separati da virgole, es. `Uptime Kuma=http://kuma.local:3001` |
 | Allarme di prova | accendilo per generare un allarme di prova, poi spegnilo |
 
 I due posti per Komodo si chiamano `komodo` e `komodo-op` (chiavi delle impostazioni); per usarne uno

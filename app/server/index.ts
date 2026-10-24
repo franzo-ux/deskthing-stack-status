@@ -34,6 +34,7 @@ const CORES = [
   { id: "komodo-op", title: "komodo-op", url: "http://komodo-2.local:9120" },
 ];
 const DEFAULT_HA = "http://homeassistant.local:8123";
+const DEFAULT_WEB = ""; // other web services to check: name=URL, ...
 
 let config: Record<string, string> = {};
 let last: HomelabStatus = { checked: 0, groups: [], problems: 0 };
@@ -165,6 +166,36 @@ async function checkHomeAssistant(): Promise<Group> {
   return group;
 }
 
+/** "Uptime Kuma=http://host:3001, Other=http://..." -> [{ name, url }] */
+function webChecks(): { name: string; url: string }[] {
+  const raw = "web_checks" in config ? config.web_checks : DEFAULT_WEB;
+  return raw
+    .split(",")
+    .map((part) => {
+      const i = part.indexOf("=");
+      return i > 0 ? { name: part.slice(0, i).trim(), url: part.slice(i + 1).trim() } : { name: "", url: "" };
+    })
+    .filter((c) => c.name && /^https?:\/\//.test(c.url));
+}
+
+async function checkWeb(): Promise<Group | null> {
+  const checks = webChecks();
+  if (!checks.length) return null;
+  const group: Group = { id: "web", title: "web", online: true, error: null, items: [] };
+  group.items = await Promise.all(
+    checks.map(async (c): Promise<Item> => {
+      try {
+        const res = await fetch(c.url, { signal: AbortSignal.timeout(5000) });
+        const ok = res.status < 500;
+        return { key: "web/" + c.name, name: c.name, detail: ok ? t(lang, "online") : t(lang, "httpError", { n: res.status }), level: ok ? "ok" : "bad" };
+      } catch {
+        return { key: "web/" + c.name, name: c.name, detail: t(lang, "noReply"), level: "bad" };
+      }
+    }),
+  );
+  return group;
+}
+
 // ---------------------------------------------------------------- alerts
 
 declare const __dirname: string;
@@ -196,13 +227,15 @@ function alert(text: string) {
 }
 
 async function poll() {
-  const groups = await Promise.all([...CORES.filter((c) => coreUrl(c)).map(checkCore), checkHomeAssistant()]);
+  const groups = (
+    await Promise.all([...CORES.filter((c) => coreUrl(c)).map(checkCore), checkHomeAssistant(), checkWeb()])
+  ).filter((g): g is Group => g !== null);
   const levels = new Map<string, Level>();
   const news: string[] = [];
   for (const g of groups) {
     const coreKey = g.id + "/core";
     // a Komodo core that does not answer is itself a problem (no blind spot)
-    if (g.id !== "ha") {
+    if (g.id !== "ha" && g.id !== "web") {
       const lvl: Level = g.online ? "ok" : g.missingKey ? "warn" : "bad";
       levels.set(coreKey, lvl);
       if (!firstPoll && lvl === "bad" && prevLevels.get(coreKey) !== "bad") news.push(g.title + ": " + g.error);
@@ -269,6 +302,13 @@ DeskThing.on(DESKTHING_EVENTS.START, async () => {
     value: false,
   };
   settings.ha_url = { id: "ha_url", label: t(lang, "setHa"), type: SETTING_TYPES.STRING, value: DEFAULT_HA };
+  settings.web_checks = {
+    id: "web_checks",
+    label: t(lang, "setWeb"),
+    description: t(lang, "setWebDesc"),
+    type: SETTING_TYPES.STRING,
+    value: DEFAULT_WEB,
+  };
   await DeskThing.initSettings(settings);
   const saved = (await DeskThing.getSettings()) as any;
   testAlert = saved?.test_alert?.value === true;
