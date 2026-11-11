@@ -14,6 +14,20 @@ const DeskThing = createDeskThing();
 document.addEventListener("mousedown", (e) => e.preventDefault(), true);
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 
+// Write to the page only when something changed: rebuilding the same text or
+// HTML every second leaves garbage DOM nodes that the Car Thing's Chrome
+// collects too late (its memory watchdog kills Chrome first).
+const lastHtml = new WeakMap<Element, string>();
+function setHtml(el: Element, html: string) {
+  if (lastHtml.get(el) === html) return;
+  lastHtml.set(el, html);
+  el.innerHTML = html;
+}
+function setText(el: Element, text: string) {
+  lastHtml.delete(el); // the element no longer holds the last HTML written
+  if (el.textContent !== text) el.textContent = text;
+}
+
 const TAG: Record<Level, string> = { ok: "[ OK ]", warn: "[WARN]", bad: "[FAIL]" };
 const SHORT: Record<string, string> = { komodo: "komodo", "komodo-op": "komodo-op" };
 
@@ -95,10 +109,10 @@ function render() {
 
   const d = new Date(status.checked);
   const hh = (n: number) => (n < 10 ? "0" : "") + n;
-  $("foot").innerHTML = bad
+  setHtml($("foot"), bad
     ? '<span class="bad">' + tr(bad === 1 ? "problemFor" : "problemsFor", { n: bad, t: clock(Date.now() - (troubleSince || Date.now())) }) + "</span>" +
       '<span class="hd">  · ' + tr("running", { n: healthy.length }) + "</span>"
-    : '<span class="hd">' + tr("lastCheck", { time: status.checkedLabel || hh(d.getHours()) + ":" + hh(d.getMinutes()) + ":" + hh(d.getSeconds()), n: healthy.length }) + "</span>";
+    : '<span class="hd">' + tr("lastCheck", { time: status.checkedLabel || hh(d.getHours()) + ":" + hh(d.getMinutes()) + ":" + hh(d.getSeconds()), n: healthy.length }) + "</span>");
 
   setTrouble(bad > 0);
 }
@@ -147,16 +161,29 @@ const STEP_MS = 150;
 const FALL_MS = 150;
 
 const actor = $("actor");
-const frameImg = $("frame") as HTMLImageElement;
 const slices = Array.prototype.slice.call(document.querySelectorAll(".slice")) as HTMLImageElement[];
 
-// preload every frame so switching never flashes
+// One <img> per frame, created once; animating means showing one and hiding
+// the previous. Changing a single image's src several times a second made the
+// Car Thing's old Chrome keep more and more decoded images (memory grew until
+// its watchdog killed Chrome).
 const ALL = ([] as string[]).concat(
   [0, 1, 2, 3, 4, 5, 6, 7].map((i) => "walk_r" + i),
   [0, 1, 2, 3, 4, 5, 6, 7].map((i) => "walk_l" + i),
   [0, 1, 2, 3, 4, 5].map((i) => "fall" + i),
 );
-ALL.forEach((n) => (new Image().src = "mascot/" + n + ".png"));
+const frames: Record<string, HTMLImageElement> = {};
+const firstFrame = $("frame");
+ALL.forEach((n) => {
+  const img = document.createElement("img");
+  img.className = "main";
+  img.alt = "";
+  img.src = "mascot/" + n + ".png";
+  img.style.display = "none";
+  actor.insertBefore(img, firstFrame);
+  frames[n] = img;
+});
+firstFrame.parentNode!.removeChild(firstFrame);
 
 let trouble = false;
 let mode: "walk" | "fall" | "down" = "walk";
@@ -168,10 +195,11 @@ let current = "";
 
 function show(name: string) {
   if (name === current) return;
+  if (frames[current]) frames[current].style.display = "none";
+  frames[name].style.display = "block";
   current = name;
-  const src = "mascot/" + name + ".png";
-  frameImg.src = src;
-  slices.forEach((sl) => (sl.src = src));
+  // the glitch copies are only visible once she is down: update them then
+  if (mode !== "walk") slices.forEach((sl) => (sl.src = "mascot/" + name + ".png"));
 }
 
 function setTrouble(on: boolean) {
