@@ -312,17 +312,21 @@ DeskThing.on(DESKTHING_EVENTS.START, async () => {
   await DeskThing.initSettings(settings);
   const saved = (await DeskThing.getSettings()) as any;
   testAlert = saved?.test_alert?.value === true;
+  started = true;
   readSettings(saved);
   startPolling();
 });
 
 let testAlert = false;
+// DeskThing also sends the saved settings while the app starts: only a switch
+// turned on after the start is a request for a test alarm
+let started = false;
 
 DeskThing.on(DESKTHING_EVENTS.SETTINGS, (data) => {
   const l = (data.payload as any)?.language?.value;
   if (isLang(l)) lang = l; // texts follow at the next poll; setting labels at next start
   const on = (data.payload as any)?.test_alert?.value === true;
-  if (on && !testAlert) alert(t(lang, "testAlert"));
+  if (on && !testAlert && started) alert(t(lang, "testAlert"));
   testAlert = on;
   readSettings(data.payload);
   firstPoll = true; // new keys: do not raise alerts for the first round
